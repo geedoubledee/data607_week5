@@ -1,0 +1,100 @@
+---
+title: "Data 607 - Week 5"
+author: "Glen Dale Davis"
+date: "2023-02-24"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Load the Packages:
+
+Below, the packages required for data analysis and visualization are loaded.
+
+```{r packages, warning = FALSE, message = FALSE}
+library(magrittr)
+library(tidyverse)
+library(DT)
+```
+
+## Load the Messy Data:
+
+Below, we load the messy data regarding delayed vs. on time arrivals for two airlines (ALASKA and AMWEST).
+
+```{r wk5_flights}
+my_url <- "https://raw.githubusercontent.com/geedoubledee/data607_week5/main/week5_flights.csv"
+wk5_flights <- read.csv(my_url)
+as_tibble(wk5_flights)
+```
+
+## Tidy Up the Data:
+
+To tidy up the messy arrivals data, we delete one unnecessary row and add airline values to two empty cells. Then we pivot the wide data into a longer format, where each row represents an observation and every column represents a variable. We rename the columns to represent these variables: airline, arrival status, destination, and count.
+
+```{r wk5_flights_tidy}
+wk5_flights_tidy <- wk5_flights
+wk5_flights_tidy <- subset(wk5_flights_tidy[-3, ])
+wk5_flights_tidy[2, 1] <- "ALASKA"
+wk5_flights_tidy[4, 1] <- "AMWEST"
+wk5_flights_tidy %<>%
+    pivot_longer(cols = !starts_with("X"),
+                 names_to = "destination",
+                 values_to = "count")
+cols <- c("airline", "arrival_status", "destination", "count")
+colnames(wk5_flights_tidy) <- cols
+datatable(wk5_flights_tidy, options = list(pageLength = 10))
+
+```
+
+## Analysis:
+
+We group the tidy data by airline and arrival status so that we can then sum the total delayed arrivals and the total on time arrivals for each airline. These sums are displayed in a summary table. 
+
+```{r analysis, warning = FALSE, message = FALSE}
+wk5_flights_tidy_analysis <- wk5_flights_tidy
+wk5_flights_tidy_analysis %<>%
+    group_by(airline, arrival_status) %>%
+    summarize(total = sum(count))
+datatable(wk5_flights_tidy_analysis)
+
+```
+
+Looking at the summary table, AMWEST recorded more delayed arrivals than ALASKA. However, AMWEST also recorded a greater number of arrivals total. So we need to compare the proportion of arrivals that were delayed for each airline instead. To easily compare the proportions visually without having to calculate them, we create a percent stacked bar plot.
+
+```{r visuals}
+ggplot(wk5_flights_tidy_analysis, aes(x = airline, y = total,
+                                      fill = arrival_status)) +
+    geom_bar(position = "fill", stat = "identity") +
+    ggtitle("Proportion of Delayed vs. On Time Arrivals By Airline") +
+    xlab("airline") +
+    ylab("proportion")
+
+```
+
+By looking at the percent stacked bar plot, we see that ALASKA recorded a slightly greater proportion of delayed arrivals than AMWEST.
+
+## Conclusions:
+
+To confirm what we see and find out how big the difference actually is, we calculate the exact proportions:
+
+```{r conclusions}
+alaska_delayed <- unlist(wk5_flights_tidy_analysis[1, 3] /
+    sum(wk5_flights_tidy_analysis[1:2, 3]))
+amwest_delayed <- unlist(wk5_flights_tidy_analysis[3, 3] /
+    sum(wk5_flights_tidy_analysis[3:4, 3]))
+
+diff <- alaska_delayed - amwest_delayed
+
+printable_vars <- list(
+    a = round(alaska_delayed, 3),
+    b = round(amwest_delayed, 3),
+    c = round(diff, 3)
+)
+
+```
+
+Proportion of ALASKA arrivals delayed: `r printable_vars$a` | Proportion of AMWEST arrivals delayed: `r printable_vars$b` | Difference: `r printable_vars$c`
+
+ALASKA had roughly 2% more delayed arrivals than AMWEST. 
